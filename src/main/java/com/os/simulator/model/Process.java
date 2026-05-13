@@ -5,17 +5,30 @@ package com.os.simulator.model;
  * Contiene la informacion necesaria para planificarlo, ejecutarlo y registrar su historial.
  */
 public class Process {
+    // Identificador unico del proceso; se mantiene final porque no cambia durante la simulacion.
     private final int pid;
+    // Nombre legible para mostrarlo en la interfaz y en los logs.
     private String name;
+    // Estado actual del proceso dentro del ciclo de vida del simulador.
     private ProcessState state;
+    // Prioridad de planificacion; a mayor valor, mayor preferencia en el algoritmo por prioridades.
     private int priority;
+    // Total de CPU que necesita el proceso para terminar.
     private int cpuBurst;
+    // CPU consumida hasta el momento.
     private int cpuUsed;
+    // Memoria solicitada por el proceso para poder entrar al sistema.
     private int memoryRequired;
+    // Instante en el que el proceso llega al sistema.
     private int arrivalTime;
+    // Tiempo acumulado esperando en READY o WAITING.
     private int waitingTime;
+    // Tiempo total entre llegada y terminacion.
     private int turnaroundTime;
+    // Motivo por el que termino el proceso; ayuda a auditoria y depuracion.
     private String terminationReason;
+    // Marca si el proceso ya tiene memoria reservada dentro del simulador.
+    private boolean memoryAllocated;
 
     /**
      * Crea un proceso con sus parametros principales.
@@ -39,6 +52,24 @@ public class Process {
         this.waitingTime = 0;
         this.turnaroundTime = 0;
         this.terminationReason = "";
+        this.memoryAllocated = false;
+    }
+
+    /**
+     * Crea una copia del proceso conservando sus datos de planificacion.
+     *
+     * @return nueva instancia con los mismos valores de negocio.
+     */
+    public Process copy() {
+        // Se crea una copia porque las comparaciones deben correr con datos independientes.
+        Process copy = new Process(pid, name, priority, cpuBurst, memoryRequired, arrivalTime);
+        copy.setState(state);
+        copy.setCpuUsed(cpuUsed);
+        copy.setWaitingTime(waitingTime);
+        copy.setTurnaroundTime(turnaroundTime);
+        copy.setTerminationReason(terminationReason);
+        copy.setMemoryAllocated(memoryAllocated);
+        return copy;
     }
 
     /**
@@ -47,6 +78,7 @@ public class Process {
      * @return true si el proceso termino su rafaga de CPU, false en caso contrario.
      */
     public boolean executeOneUnit() {
+        // Un proceso terminado no debe consumir mas CPU simulada.
         if (state == ProcessState.TERMINATED) {
             return true;
         }
@@ -69,6 +101,33 @@ public class Process {
      */
     public boolean isFinished() {
         return cpuUsed >= cpuBurst;
+    }
+
+    /**
+     * Incrementa el tiempo de espera acumulado cuando el proceso permanece listo o bloqueado.
+     */
+    public void incrementWaitingTime() {
+        // Solo se incrementa una unidad porque el reloj del simulador avanza de forma discreta.
+        waitingTime++;
+    }
+
+    /**
+     * Marca el proceso como propietario de memoria reservada dentro del simulador.
+     *
+     * @param memoryAllocated indica si la memoria esta reservada.
+     */
+    public void setMemoryAllocated(boolean memoryAllocated) {
+        // Este dato evita reservar la misma memoria dos veces cuando el proceso se reanuda.
+        this.memoryAllocated = memoryAllocated;
+    }
+
+    /**
+     * Indica si el proceso tiene memoria asignada dentro del simulador.
+     *
+     * @return true si ya tiene memoria reservada.
+     */
+    public boolean isMemoryAllocated() {
+        return memoryAllocated;
     }
 
     public int getPid() {
@@ -161,6 +220,7 @@ public class Process {
      * @return tiempo de CPU pendiente.
      */
     public int getRemainingCpu() {
+        // Nunca se permiten valores negativos porque eso romperia las comparaciones de SJF.
         return Math.max(cpuBurst - cpuUsed, 0);
     }
 }

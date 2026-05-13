@@ -1,7 +1,10 @@
 package com.os.simulator.view;
 
 import com.os.simulator.controllers.MainController;
+import com.os.simulator.model.ExecutionMetrics;
 import com.os.simulator.model.Process;
+import java.io.IOException;
+import java.nio.file.Path;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -26,11 +29,18 @@ import javafx.scene.control.cell.PropertyValueFactory;
  * Construye la interfaz grafica con tabs para procesos, ejecucion, comparacion e historial.
  */
 public class MainView {
+    // Nodo raiz que contiene toda la interfaz.
     private final BorderPane root;
+    // Lista observable para que la tabla se actualice automaticamente cuando cambian los procesos.
     private final ObservableList<Process> processItems;
+    // Controlador que recibe las acciones disparadas por botones y formularios.
     private final MainController controller;
+    // Area de texto donde se muestran eventos y decisiones del simulador.
     private final TextArea eventLogArea;
+    // Tabla principal donde se inspeccionan los procesos.
     private final TableView<Process> processTable;
+    // Etiqueta que resume las metricas mas importantes sin abrir otra pantalla.
+    private final Label metricsLabel;
 
     /**
      * Crea la vista principal y arma todos los componentes visuales.
@@ -38,15 +48,18 @@ public class MainView {
      * @param controller controlador principal del simulador.
      */
     public MainView(MainController controller) {
+        // Se almacena el controlador para desacoplar la vista de la logica del simulador.
         this.controller = controller;
         this.root = new BorderPane();
         this.processItems = FXCollections.observableArrayList();
         this.eventLogArea = new TextArea();
         this.processTable = new TableView<>();
+        this.metricsLabel = new Label();
         buildInterface();
     }
 
     private void buildInterface() {
+        // La estructura se divide en cabecera, contenido y barra de estado para mantener claridad visual.
         root.setPadding(new Insets(10));
         root.setTop(buildHeader());
         root.setCenter(buildTabs());
@@ -54,6 +67,7 @@ public class MainView {
     }
 
     private Parent buildHeader() {
+        // Se usa un encabezado simple porque la prioridad de esta vista es la legibilidad del simulador.
         Label title = new Label("Simulador de Gestor de Procesos");
         title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold;");
         VBox header = new VBox(title);
@@ -62,6 +76,7 @@ public class MainView {
     }
 
     private Parent buildTabs() {
+        // Cada tab representa una tarea distinta para no saturar una sola pantalla.
         TabPane tabPane = new TabPane();
         tabPane.getTabs().add(buildDashboardTab());
         tabPane.getTabs().add(buildConfigurationTab());
@@ -72,6 +87,7 @@ public class MainView {
     }
 
     private Tab buildDashboardTab() {
+        // Esta pestaña resume el estado general porque es la que el usuario consulta con mayor frecuencia.
         Tab tab = new Tab("Dashboard");
         tab.setClosable(false);
 
@@ -97,13 +113,19 @@ public class MainView {
         eventLogArea.setEditable(false);
         eventLogArea.setPrefRowCount(10);
 
-        VBox container = new VBox(10, processTable, new Label("Registro de eventos"), eventLogArea);
+        VBox container = new VBox(10,
+            processTable,
+            new Label("Metricas actuales"),
+            metricsLabel,
+            new Label("Registro de eventos"),
+            eventLogArea);
         container.setPadding(new Insets(10));
         tab.setContent(container);
         return tab;
     }
 
     private Tab buildConfigurationTab() {
+        // Aqui el usuario define la carga de trabajo y selecciona el planificador activo.
         Tab tab = new Tab("Configuracion");
         tab.setClosable(false);
 
@@ -135,6 +157,7 @@ public class MainView {
 
         Button addButton = new Button("Agregar proceso");
         addButton.setOnAction(event -> {
+            // Se valida de forma minima en la UI; la logica completa vive en el service.
             controller.createProcess(
                     nameField.getText().isBlank() ? "Proceso manual" : nameField.getText(),
                     Integer.parseInt(priorityField.getText()),
@@ -147,6 +170,7 @@ public class MainView {
 
         Button randomButton = new Button("Generar aleatorios");
         randomButton.setOnAction(event -> {
+            // Generar cargas sinteticas ayuda a comparar algoritmos sin capturar datos manualmente.
             controller.generateRandomProcesses(Integer.parseInt(randomCountField.getText()));
             refreshProcesses();
             refreshEvents();
@@ -155,7 +179,16 @@ public class MainView {
         Button schedulerButton = new Button("Aplicar planificador");
         schedulerButton.setOnAction(event -> controller.setScheduler(schedulerCombo.getValue()));
 
-        HBox buttons = new HBox(10, addButton, randomButton, schedulerButton);
+        Button exportButton = new Button("Exportar procesos");
+        exportButton.setOnAction(event -> runSafeAction(() -> controller.exportProcesses(Path.of("data", "procesos.txt"))));
+
+        Button importButton = new Button("Importar procesos");
+        importButton.setOnAction(event -> {
+            runSafeAction(() -> controller.importProcesses(Path.of("data", "procesos.txt")));
+            refreshAll();
+        });
+
+        HBox buttons = new HBox(10, addButton, randomButton, schedulerButton, exportButton, importButton);
         VBox container = new VBox(15, form, buttons);
         container.setPadding(new Insets(10));
         tab.setContent(container);
@@ -163,18 +196,52 @@ public class MainView {
     }
 
     private Tab buildExecutionTab() {
+        // Esta pestaña concentra las acciones que hacen avanzar la simulacion.
         Tab tab = new Tab("Ejecucion");
         tab.setClosable(false);
 
         Button stepButton = new Button("Ejecutar paso");
         stepButton.setOnAction(event -> {
+            // El modo paso a paso permite ver claramente como cambia cada algoritmo.
             controller.runStep();
-            refreshProcesses();
-            refreshEvents();
+            refreshAll();
         });
 
-        Label metricsLabel = new Label("Las metricas se actualizaran al ejecutar pasos.");
-        VBox container = new VBox(10, stepButton, metricsLabel);
+        Button runAllButton = new Button("Ejecutar completo");
+        runAllButton.setOnAction(event -> {
+            // La ejecucion completa sirve para obtener metricas finales sin intervenir manualmente.
+            controller.runSimulationToCompletion();
+            controller.appendExecutionToHistory();
+            refreshAll();
+        });
+
+        Button compareButton = new Button("Comparar algoritmos");
+        compareButton.setOnAction(event -> {
+            // La comparacion usa las mismas cargas para que el resultado sea justo.
+            StringBuilder builder = new StringBuilder();
+            controller.compareAlgorithms().forEach((algorithm, metrics) ->
+                    builder.append(algorithm)
+                            .append(" -> espera promedio: ")
+                            .append(formatNumber(metrics.getAverageWaitingTime()))
+                            .append(", retorno promedio: ")
+                            .append(formatNumber(metrics.getAverageTurnaroundTime()))
+                            .append(", CPU: ")
+                            .append(formatNumber(metrics.getCpuUtilization()))
+                            .append("%")
+                            .append(System.lineSeparator()));
+            eventLogArea.appendText(System.lineSeparator() + "Comparacion de algoritmos:" + System.lineSeparator() + builder);
+        });
+
+        Button suspendButton = new Button("Suspender seleccionado");
+        suspendButton.setOnAction(event -> runProcessAction(process -> controller.suspendProcess(process.getPid())));
+
+        Button resumeButton = new Button("Reanudar seleccionado");
+        resumeButton.setOnAction(event -> runProcessAction(process -> controller.resumeProcess(process.getPid())));
+
+        Button terminateButton = new Button("Terminar seleccionado");
+        terminateButton.setOnAction(event -> runProcessAction(process -> controller.terminateProcess(process.getPid(), "Terminacion manual desde la interfaz")));
+
+        VBox container = new VBox(10, stepButton, runAllButton, compareButton, suspendButton, resumeButton, terminateButton);
         container.setPadding(new Insets(10));
         tab.setContent(container);
         return tab;
@@ -205,6 +272,7 @@ public class MainView {
      * Refresca la tabla de procesos con los datos actuales del modelo.
      */
     public void refreshProcesses() {
+        // La tabla se sincroniza con el estado actual del modelo.
         processItems.setAll(controller.getProcesses());
     }
 
@@ -212,7 +280,72 @@ public class MainView {
      * Refresca el area de log con los eventos mas recientes.
      */
     public void refreshEvents() {
+        // El log se reconstruye entero porque el usuario suele leerlo como historial cronologico.
         eventLogArea.setText(String.join(System.lineSeparator(), controller.getEventLog()));
+    }
+
+    /**
+     * Refresca las metricas visibles en la interfaz.
+     */
+    public void refreshMetrics() {
+        // Se muestran solo las metricas mas relevantes para no saturar la interfaz con datos tecnicos.
+        ExecutionMetrics metrics = controller.getMetrics();
+        metricsLabel.setText(String.format(
+                "Procesos: %d | Terminados: %d | Espera promedio: %.2f | Retorno promedio: %.2f | Cambios de contexto: %d | CPU: %.2f%% | Throughput: %.4f",
+                metrics.getTotalProcesses(),
+                metrics.getCompletedProcesses(),
+                metrics.getAverageWaitingTime(),
+                metrics.getAverageTurnaroundTime(),
+                metrics.getContextSwitches(),
+                metrics.getCpuUtilization(),
+                metrics.getThroughput()));
+    }
+
+    /**
+     * Refresca toda la informacion visible en pantalla.
+     */
+    public void refreshAll() {
+        // Un solo metodo evita olvidos cuando se actualizan tabla, log y metricas a la vez.
+        refreshProcesses();
+        refreshEvents();
+        refreshMetrics();
+    }
+
+    private void runSafeAction(Action action) {
+        // Centraliza el manejo de excepciones de IO para no repetir codigo en cada boton.
+        try {
+            action.run();
+            refreshAll();
+        } catch (IOException exception) {
+            eventLogArea.appendText(System.lineSeparator() + "Error: " + exception.getMessage());
+        }
+    }
+
+    private void runProcessAction(ProcessAction action) {
+        // Las acciones sobre un proceso requieren que el usuario seleccione uno antes.
+        Process selected = processTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            eventLogArea.appendText(System.lineSeparator() + "Seleccione un proceso primero.");
+            return;
+        }
+
+        action.run(selected);
+        refreshAll();
+    }
+
+    private String formatNumber(double value) {
+        // Se formatea a dos decimales para que las metricas se lean facilmente.
+        return String.format("%.2f", value);
+    }
+
+    @FunctionalInterface
+    private interface Action {
+        void run() throws IOException;
+    }
+
+    @FunctionalInterface
+    private interface ProcessAction {
+        void run(Process process);
     }
 
     /**

@@ -15,10 +15,12 @@ public class Main extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        // Se crean primero los servicios porque la vista depende de ellos para reaccionar a eventos.
         SimulationService simulationService = new SimulationService();
         MainController mainController = new MainController(simulationService);
         MainView mainView = new MainView(mainController);
 
+        // La escena principal contiene toda la aplicacion para mantener una sola ventana consistente.
         Scene scene = new Scene(mainView.getRoot(), 1200, 800);
 
         primaryStage.setTitle("Simulador de Gestor de Procesos");
@@ -27,6 +29,7 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        // Lanzar JavaFX aqui es el punto de entrada clasico de una aplicacion de escritorio.
         launch(args);
     }
 }

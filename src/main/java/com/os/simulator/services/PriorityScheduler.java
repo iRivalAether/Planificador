@@ -10,6 +10,7 @@ import java.util.Queue;
 public class PriorityScheduler implements Scheduler {
     @Override
     public Process selectNextProcess(Queue<Process> readyQueue) {
+    // Se elige la prioridad mas alta porque ese es el criterio visible para el usuario en este algoritmo.
         Process selected = readyQueue.stream()
                 .max(Comparator.comparingInt(Process::getPriority))
                 .orElse(null);

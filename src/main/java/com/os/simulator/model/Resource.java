@@ -5,9 +5,13 @@ package com.os.simulator.model;
  * Permite reservar y liberar memoria y CPU de forma controlada.
  */
 public class Resource {
+    // Capacidad total de CPU que el simulador puede repartir.
     private final int totalCpu;
+    // Capacidad total de memoria disponible para procesos.
     private final int totalMemory;
+    // CPU actualmente reservada por procesos en ejecucion.
     private int usedCpu;
+    // Memoria actualmente comprometida por procesos admitidos.
     private int usedMemory;
 
     /**
@@ -31,6 +35,7 @@ public class Resource {
      * @return true si se puede asignar, false si no hay capacidad.
      */
     public boolean canAllocate(int cpu, int memory) {
+        // La validacion centraliza la politica de no sobreasignar recursos.
         return usedCpu + cpu <= totalCpu && usedMemory + memory <= totalMemory;
     }
 
@@ -42,6 +47,7 @@ public class Resource {
      * @return true si se reservo correctamente, false si no hay recursos.
      */
     public boolean allocate(int cpu, int memory) {
+        // Si no alcanza la capacidad, no se modifica el estado interno.
         if (!canAllocate(cpu, memory)) {
             return false;
         }
@@ -58,6 +64,7 @@ public class Resource {
      * @param memory memoria a liberar.
      */
     public void release(int cpu, int memory) {
+        // Se protege contra valores negativos para no dejar recursos inconsistentes.
         usedCpu = Math.max(usedCpu - cpu, 0);
         usedMemory = Math.max(usedMemory - memory, 0);
     }
@@ -84,6 +91,7 @@ public class Resource {
      * @return cpu libre.
      */
     public int getAvailableCpu() {
+        // CPU libre = total menos lo ya reservado.
         return totalCpu - usedCpu;
     }
 
@@ -93,6 +101,7 @@ public class Resource {
      * @return memoria libre.
      */
     public int getAvailableMemory() {
+        // Memoria libre = total menos lo ya comprometido.
         return totalMemory - usedMemory;
     }
 }
