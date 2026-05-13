@@ -1,0 +1,48 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Usuario" as Usuario
+actor "Exportador" as Exportador
+actor "Importador" as Importador
+
+rectangle "Simulador de Gestor de Procesos" {
+    usecase "Crear proceso manual" as UC1
+    usecase "Generar procesos aleatorios" as UC2
+    usecase "Seleccionar algoritmo" as UC3
+    usecase "Ejecutar simulacion" as UC4
+    usecase "Ejecutar paso a paso" as UC5
+    usecase "Suspender proceso" as UC6
+    usecase "Reanudar proceso" as UC7
+    usecase "Terminar proceso" as UC8
+    usecase "Ver logs de eventos" as UC9
+    usecase "Comparar algoritmos" as UC10
+    usecase "Importar procesos" as UC11
+    usecase "Exportar procesos" as UC12
+    usecase "Ver historial" as UC13
+    usecase "Ejecutar caso de sincronizacion" as UC14
+}
+
+Usuario --> UC1
+Usuario --> UC2
+Usuario --> UC3
+Usuario --> UC4
+Usuario --> UC5
+Usuario --> UC6
+Usuario --> UC7
+Usuario --> UC8
+Usuario --> UC9
+Usuario --> UC10
+Usuario --> UC11
+Usuario --> UC12
+Usuario --> UC13
+Usuario --> UC14
+
+Importador --> UC11
+Exportador --> UC12
+
+UC4 .> UC3 : incluye
+UC10 .> UC3 : reutiliza
+UC14 .> UC4 : usa motor de simulacion
+@enduml

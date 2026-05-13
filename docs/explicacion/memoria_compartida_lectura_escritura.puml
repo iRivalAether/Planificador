@@ -1,0 +1,35 @@
+@startuml
+title Lectura y escritura en memoria compartida
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Proceso escritor" as Writer
+actor "Proceso lector" as Reader
+participant "Mutex" as Mutex
+participant "SharedMemory" as SharedMemory
+
+Writer -> Mutex : tryLock(pidEscritor)
+alt mutex libre
+    Mutex --> Writer : acceso concedido
+    Writer -> SharedMemory : write(pidEscritor, dato)
+    SharedMemory --> Writer : dato guardado
+    Writer -> Mutex : unlock(pidEscritor)
+else mutex ocupado
+    Mutex --> Writer : proceso en espera
+end
+
+Reader -> Mutex : tryLock(pidLector)
+alt mutex libre
+    Mutex --> Reader : acceso concedido
+    Reader -> SharedMemory : read(pidLector)
+    SharedMemory --> Reader : dato recuperado
+    Reader -> Mutex : unlock(pidLector)
+else mutex ocupado
+    Mutex --> Reader : proceso en espera
+end
+
+note over Writer,Reader
+La lectura y escritura se controlan con mutex para evitar condiciones de carrera.
+El programa simula el acceso, no el paralelismo real del sistema operativo.
+end note
+@enduml

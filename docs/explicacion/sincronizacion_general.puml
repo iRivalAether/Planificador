@@ -1,0 +1,66 @@
+@startuml
+title Sincronizacion y comunicacion dentro del simulador
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Usuario" as Usuario
+participant "MainView" as View
+participant "MainController" as Controller
+participant "SimulationService" as Service
+participant "Mutex" as Mutex
+participant "Semaphore" as Semaphore
+participant "SharedMemory" as SharedMemory
+participant "SystemState" as State
+participant "Proceso productor" as Producer
+participant "Proceso consumidor" as Consumer
+
+Usuario -> View : ejecutar caso de sincronizacion
+View -> Controller : solicitar simulacion de comunicacion
+Controller -> Service : iniciar escenario productor-consumidor
+Service -> State : registrar procesos de sincronizacion
+
+Producer -> Semaphore : waitFor(pid)
+alt existe espacio disponible
+    Semaphore --> Producer : permite continuar
+    Producer -> Mutex : tryLock(pid)
+    alt mutex libre
+        Mutex --> Producer : acceso concedido
+        Producer -> SharedMemory : write(pid, dato)
+        SharedMemory -> Mutex : proteger escritura
+        SharedMemory --> Producer : dato almacenado
+        Producer -> Mutex : unlock(pid)
+        Producer -> Semaphore : signal()
+        Producer -> State : logEvent("Productor escribio en memoria compartida")
+    else mutex ocupado
+        Mutex --> Producer : debe esperar
+        Producer -> State : cambiar a WAITING
+    end
+else no hay espacio
+    Semaphore --> Producer : bloqueado
+    Producer -> State : cambiar a WAITING
+end
+
+Consumer -> Semaphore : waitFor(pid)
+alt existe dato disponible
+    Semaphore --> Consumer : permite continuar
+    Consumer -> Mutex : tryLock(pid)
+    alt mutex libre
+        Mutex --> Consumer : acceso concedido
+        Consumer -> SharedMemory : read(pid)
+        SharedMemory -> Mutex : proteger lectura
+        SharedMemory --> Consumer : dato leido
+        Consumer -> Mutex : unlock(pid)
+        Consumer -> Semaphore : signal()
+        Consumer -> State : logEvent("Consumidor leyo desde memoria compartida")
+    else mutex ocupado
+        Mutex --> Consumer : debe esperar
+        Consumer -> State : cambiar a WAITING
+    end
+else no hay datos
+    Semaphore --> Consumer : bloqueado
+    Consumer -> State : cambiar a WAITING
+end
+
+Service -> State : actualizar lista de eventos y estados
+Controller -> View : refrescar tabla, log y estado visual
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+title Estados de un proceso en el simulador
+skinparam shadowing false
+
+[*] --> NEW
+NEW --> READY : registrar proceso
+READY --> RUNNING : scheduler selecciona
+RUNNING --> READY : quantum termina / no finaliza
+RUNNING --> WAITING : espera recurso o sincronizacion
+WAITING --> READY : recurso liberado / evento atendido
+RUNNING --> TERMINATED : completa rafaga
+SUSPENDED --> READY : reanudar
+READY --> SUSPENDED : suspender
+WAITING --> SUSPENDED : suspender por administracion
+TERMINATED --> [*]
+
+note right of WAITING
+El proceso no avanza mientras espera
+mutex, semaforo, I/O o liberacion de recurso.
+end note
+
+note bottom of RUNNING
+El proceso consume CPU simulada durante la unidad de tiempo asignada.
+end note
+@enduml

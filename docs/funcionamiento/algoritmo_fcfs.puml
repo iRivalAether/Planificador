@@ -1,0 +1,55 @@
+@startuml
+title Flujo interno de FCFS en el simulador
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Vista" as View
+participant "MainController" as Controller
+participant "SimulationService" as Service
+participant "FCFSScheduler" as Scheduler
+participant "SystemState" as State
+participant "Process" as Process
+
+View -> Controller : solicitar ejecucion de paso
+Controller -> Service : runStep()
+Service -> State : validar cola READY
+alt cola vacia
+    State --> Service : sin procesos listos
+    Service -> State : logEvent("No hay procesos para FCFS")
+    Service --> Controller : null
+    Controller --> View : mostrar mensaje de espera
+else cola con procesos
+    Service -> Scheduler : selectNextProcess(readyQueue)
+    Scheduler -> State : extraer primer proceso disponible
+    State --> Scheduler : proceso con mayor antiguedad en la cola
+    Scheduler --> Service : proceso seleccionado
+    Service -> Process : setState(RUNNING)
+    Service -> State : logEvent("FCFS selecciona el primer proceso")
+    loop una unidad de CPU por paso
+        Service -> Process : executeOneUnit()
+        Service -> State : tick()
+    end
+    alt proceso terminado
+        Service -> Process : setState(TERMINATED)
+        Service -> Process : setTurnaroundTime(tiempo actual - llegada)
+        Service -> State : registrar fin y liberar recursos asociados
+    else proceso no terminado
+        Service -> Process : setState(READY)
+        Service -> State : reinsertar al final de READY
+        Service -> State : registrar continuidad del proceso
+    end
+    Service -> State : actualizar metricas basicas
+    Service --> Controller : proceso ejecutado
+    Controller --> View : refrescar tabla, cola y logs
+end
+
+note right of Scheduler
+FCFS no reordena por prioridad ni por rafaga.
+Selecciona el primer proceso que llego a la cola READY.
+end note
+
+note bottom of State
+El estado mantiene la cola, el reloj simulador
+y el registro de eventos visibles en la interfaz.
+end note
+@enduml

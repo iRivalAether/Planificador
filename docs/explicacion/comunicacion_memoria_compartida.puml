@@ -1,0 +1,35 @@
+@startuml
+title Comunicacion por memoria compartida
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Proceso A" as A
+actor "Proceso B" as B
+participant "Mutex" as Mutex
+participant "SharedMemory" as SharedMemory
+
+A -> Mutex : tryLock(pidA)
+alt acceso concedido
+    Mutex --> A : ok
+    A -> SharedMemory : write(pidA, informacion)
+    SharedMemory --> A : informacion guardada
+    A -> Mutex : unlock(pidA)
+else acceso denegado
+    Mutex --> A : esperar
+end
+
+B -> Mutex : tryLock(pidB)
+alt acceso concedido
+    Mutex --> B : ok
+    B -> SharedMemory : read(pidB)
+    SharedMemory --> B : informacion leida
+    B -> Mutex : unlock(pidB)
+else acceso denegado
+    Mutex --> B : esperar
+end
+
+note over A,B
+La memoria compartida permite intercambiar datos entre procesos.
+El mutex evita corrupcion de la informacion cuando varios procesos intentan acceder al mismo tiempo.
+end note
+@enduml

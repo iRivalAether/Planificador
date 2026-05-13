@@ -1,0 +1,50 @@
+@startuml
+title Caso de uso: Productor y consumidor
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Productor" as Producer
+actor "Consumidor" as Consumer
+participant "Semaphore emptySlots" as Empty
+participant "Semaphore filledSlots" as Filled
+participant "Mutex" as Mutex
+participant "SharedMemory" as SharedMemory
+
+Producer -> Empty : waitFor(pid)
+alt hay espacio libre
+    Empty --> Producer : continuar
+    Producer -> Mutex : tryLock(pid)
+    alt mutex libre
+        Mutex --> Producer : acceso concedido
+        Producer -> SharedMemory : write(pid, producto)
+        SharedMemory --> Producer : producto almacenado
+        Producer -> Mutex : unlock(pid)
+        Producer -> Filled : signal()
+    else mutex ocupado
+        Mutex --> Producer : esperar
+    end
+else buffer lleno
+    Empty --> Producer : esperar
+end
+
+Consumer -> Filled : waitFor(pid)
+alt hay dato disponible
+    Filled --> Consumer : continuar
+    Consumer -> Mutex : tryLock(pid)
+    alt mutex libre
+        Mutex --> Consumer : acceso concedido
+        Consumer -> SharedMemory : read(pid)
+        SharedMemory --> Consumer : producto obtenido
+        Consumer -> Mutex : unlock(pid)
+        Consumer -> Empty : signal()
+    else mutex ocupado
+        Mutex --> Consumer : esperar
+    end
+else buffer vacio
+    Filled --> Consumer : esperar
+end
+
+note bottom
+Este diagrama separa claramente la comunicacion por memoria compartida del control de acceso mediante semaforos y mutex.
+end note
+@enduml

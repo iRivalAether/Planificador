@@ -1,0 +1,9 @@
+Arquitectura propuesta:
+
+- model: contiene Process, Resource, SystemState, ExecutionMetrics y estados.
+- view: contiene la ventana principal JavaFX.
+- controllers: conecta la vista con los servicios.
+- services: contiene la simulacion, planificadores, sincronizacion e historial.
+
+Flujo principal:
+Vista -> Controlador -> Servicio -> Modelo -> Servicio -> Vista

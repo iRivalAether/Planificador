@@ -1,0 +1,67 @@
+@startuml
+title Flujo del motor de simulacion y algoritmos
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+participant "MainController" as Controller
+participant "SimulationService" as Service
+participant "SystemState" as State
+participant "Scheduler" as Scheduler
+participant "Process" as Process
+
+Controller -> Service : runStep()
+Service -> State : obtener cola READY
+alt no hay procesos listos
+    State --> Service : cola vacia
+    Service -> State : logEvent("El motor no encontro procesos listos")
+    Service --> Controller : null
+    Controller -> Controller : mantener la vista sin cambios de ejecucion
+else hay procesos listos
+    Service -> Scheduler : selectNextProcess(readyQueue)
+    alt algoritmo FCFS
+        Scheduler --> Service : primer proceso de la cola
+    else algoritmo SJF
+        Scheduler --> Service : proceso con menor rafaga restante
+    else algoritmo Round Robin
+        Scheduler --> Service : primer proceso de la cola
+    else algoritmo Prioridad
+        Scheduler --> Service : proceso con mayor prioridad
+    end
+
+    Service -> Process : setState(RUNNING)
+    Service -> State : logEvent("Proceso en ejecucion")
+    loop ciclo de CPU simulada
+        Service -> Process : executeOneUnit()
+        Service -> State : tick()
+    end
+
+    alt proceso finalizado
+        Service -> Process : setState(TERMINATED)
+        Service -> Process : setTurnaroundTime(tiempo actual - llegada)
+        Service -> State : registrar terminacion
+        Service -> State : liberar recursos si aplica
+    else proceso no finalizado
+        Service -> Process : setState(READY)
+        Service -> State : reinsertar en READY
+        Service -> State : incrementar espera acumulada
+    end
+
+    Service -> State : actualizar metricas globales
+    Service -> State : registrar contexto de la ejecucion
+    Controller -> Controller : actualizar metricas y vista
+end
+
+note right of Service
+El motor coordina:
+1. seleccion del algoritmo
+2. ejecucion simulada
+3. actualizacion de estados
+4. registro de eventos
+5. refresco de metricas
+end note
+
+note bottom of State
+El estado global conserva la cola READY,
+la lista de procesos, el reloj y el historial de eventos.
+end note
+@enduml

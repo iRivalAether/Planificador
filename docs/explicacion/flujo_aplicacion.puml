@@ -1,0 +1,36 @@
+@startuml
+skinparam shadowing false
+skinparam activity {
+    BackgroundColor white
+    BorderColor black
+}
+
+title Flujo general de la aplicacion
+
+start
+:Iniciar aplicacion JavaFX;
+:Mostrar ventana principal;
+if (Usuario crea o carga procesos?) then (si)
+    :Registrar procesos en el sistema;
+else (no)
+    :Esperar accion del usuario;
+endif
+:Seleccionar algoritmo de planificacion;
+if (Usuario ejecuta simulacion?) then (si)
+    :Procesar cola de listos;
+    :Aplicar algoritmo seleccionado;
+    :Actualizar estados y metricas;
+    :Registrar evento en historial;
+else (no)
+    :Mantener interfaz disponible;
+endif
+if (Usuario compara algoritmos?) then (si)
+    :Ejecutar todos los algoritmos;
+    :Calcular metricas comparativas;
+    :Mostrar graficas y tablas;
+endif
+if (Usuario importa o exporta datos?) then (si)
+    :Leer o escribir archivos txt;
+endif
+stop
+@enduml

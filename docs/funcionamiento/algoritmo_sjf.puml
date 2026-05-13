@@ -1,0 +1,51 @@
+@startuml
+title Flujo interno de SJF en el simulador
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Vista" as View
+participant "MainController" as Controller
+participant "SimulationService" as Service
+participant "SJFScheduler" as Scheduler
+participant "SystemState" as State
+participant "Process" as Process
+
+View -> Controller : solicitar ejecucion de paso
+Controller -> Service : runStep()
+Service -> State : validar procesos listos
+alt cola vacia
+    State --> Service : sin candidatos
+    Service -> State : logEvent("No hay procesos para SJF")
+    Service --> Controller : null
+    Controller --> View : mostrar estado inactivo
+else cola con procesos
+    Service -> Scheduler : selectNextProcess(readyQueue)
+    Scheduler -> State : revisar procesos listos
+    Scheduler -> Scheduler : comparar rafagas restantes
+    Scheduler -> Scheduler : elegir menor tiempo de CPU pendiente
+    Scheduler -> State : remover proceso seleccionado
+    Scheduler --> Service : proceso con menor CPU restante
+    Service -> Process : setState(RUNNING)
+    Service -> State : logEvent("SJF selecciona el proceso mas corto")
+    loop ejecutar una unidad de CPU
+        Service -> Process : executeOneUnit()
+        Service -> State : tick()
+    end
+    alt proceso terminado
+        Service -> Process : setState(TERMINATED)
+        Service -> Process : setTurnaroundTime(tiempo actual - llegada)
+        Service -> State : registrar fin y liberar memoria simulada
+    else proceso no terminado
+        Service -> Process : setState(READY)
+        Service -> State : devolver el proceso a READY para futura reevaluacion
+    end
+    Service -> State : recalcular tiempos promedio de espera y retorno
+    Service --> Controller : proceso ejecutado
+    Controller --> View : refrescar tabla, log y metricas
+end
+
+note right of Scheduler
+SJF prioriza la menor rafaga restante.
+Si dos procesos empatan, la seleccion sigue el orden de aparicion en la cola.
+end note
+@enduml

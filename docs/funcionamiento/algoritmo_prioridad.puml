@@ -1,0 +1,52 @@
+@startuml
+title Flujo interno del algoritmo por prioridad en el simulador
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Vista" as View
+participant "MainController" as Controller
+participant "SimulationService" as Service
+participant "PriorityScheduler" as Scheduler
+participant "SystemState" as State
+participant "Process" as Process
+
+View -> Controller : solicitar ejecucion de paso
+Controller -> Service : runStep()
+Service -> State : validar cola READY
+alt cola vacia
+    State --> Service : sin candidatos
+    Service -> State : logEvent("No hay procesos para planificacion por prioridad")
+    Service --> Controller : null
+    Controller --> View : mostrar mensaje de inactividad
+else cola con procesos
+    Service -> Scheduler : selectNextProcess(readyQueue)
+    Scheduler -> State : revisar procesos listos
+    Scheduler -> Scheduler : comparar nivel de prioridad
+    Scheduler -> Scheduler : elegir el valor mas alto
+    Scheduler -> State : remover proceso seleccionado
+    Scheduler --> Service : proceso con prioridad mas alta
+    Service -> Process : setState(RUNNING)
+    Service -> State : logEvent("Prioridad selecciona el proceso mas urgente")
+    loop ejecutar una unidad de CPU
+        Service -> Process : executeOneUnit()
+        Service -> State : tick()
+    end
+    alt proceso terminado
+        Service -> Process : setState(TERMINATED)
+        Service -> Process : setTurnaroundTime(tiempo actual - llegada)
+        Service -> State : registrar fin
+    else proceso no terminado
+        Service -> Process : setState(READY)
+        Service -> State : reinsertar en READY
+        Service -> State : conservar prioridad para la siguiente seleccion
+    end
+    Service -> State : actualizar metricas de ejecucion
+    Service --> Controller : proceso ejecutado
+    Controller --> View : refrescar tabla, logs y graficos
+end
+
+note right of Scheduler
+La prioridad mas alta tiene preferencia.
+El algoritmo puede ampliarse luego con envejecimiento para evitar inanicion.
+end note
+@enduml

@@ -1,0 +1,54 @@
+@startuml
+title Flujo interno de Round Robin en el simulador
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Vista" as View
+participant "MainController" as Controller
+participant "SimulationService" as Service
+participant "RoundRobinScheduler" as Scheduler
+participant "SystemState" as State
+participant "Process" as Process
+
+View -> Controller : solicitar ejecucion de paso
+Controller -> Service : runStep()
+Service -> State : validar cola READY
+alt cola vacia
+    State --> Service : sin procesos
+    Service -> State : logEvent("Round Robin no encontro procesos listos")
+    Service --> Controller : null
+    Controller --> View : mostrar espera
+else cola con procesos
+    Service -> Scheduler : selectNextProcess(readyQueue)
+    Scheduler -> State : obtener primer proceso de la cola
+    Scheduler --> Service : proceso seleccionado
+    Service -> Process : setState(RUNNING)
+    Service -> State : logEvent("Round Robin asigna turno")
+    loop ejecutar hasta completar quantum o terminar
+        Service -> Process : executeOneUnit()
+        Service -> State : tick()
+    end
+    alt proceso terminado antes del quantum
+        Service -> Process : setState(TERMINATED)
+        Service -> Process : setTurnaroundTime(tiempo actual - llegada)
+        Service -> State : registrar fin
+    else proceso aun activo
+        Service -> Process : setState(READY)
+        Service -> State : devolver a READY al final de la cola
+        Service -> State : registrar expiracion del quantum
+    end
+    Service -> State : actualizar contador de cambios de contexto
+    Service --> Controller : proceso ejecutado
+    Controller --> View : refrescar tabla, cola y logs
+end
+
+note right of Scheduler
+Round Robin trata a todos los procesos por igual.
+El quantum determina cuanto tiempo se simula en cada turno.
+end note
+
+note bottom of Service
+El servicio coordina el tiempo simulado y el reingreso a la cola.
+El planificador solo selecciona el siguiente candidato.
+end note
+@enduml
