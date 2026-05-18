@@ -15,3 +15,10 @@ Planificador es un proyecto desarrollado para la materia de Sistemas Operativos 
 - Tello Ponce Fabian Enrique  
 - Ortiz Sosa Jose Jareth  
 - Gomez Sanchez Haziel Emiliano  
+
+## Unidades y valores por defecto
+
+- La memoria se expresa en megabytes (MB). Por defecto el simulador usa 4096 MB (4 GB).
+- El CPU se expresa en nucleos. Por defecto el simulador usa 4 nucleos.
+
+Ajuste estos valores desde la pestaña de configuracion al crear procesos.

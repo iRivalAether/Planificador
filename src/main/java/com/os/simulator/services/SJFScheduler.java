@@ -10,11 +10,12 @@ import java.util.Queue;
 public class SJFScheduler implements Scheduler {
     @Override
     public Process selectNextProcess(Queue<Process> readyQueue) {
-    // SJF busca el proceso con menor CPU restante para reducir el tiempo promedio de espera.
+        // SJF busca el proceso con menor CPU restante para reducir el tiempo promedio de espera.
         Process selected = readyQueue.stream()
-                .min(Comparator.comparingInt(Process::getRemainingCpu))
+                .min(Comparator.comparingInt(Process::getRemainingCpu)) // Selecciona por rafaga restante.
                 .orElse(null);
 
+        // Eliminamos el proceso seleccionado de la cola para no duplicarlo.
         if (selected != null) {
             readyQueue.remove(selected);
         }

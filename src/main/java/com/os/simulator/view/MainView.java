@@ -19,6 +19,7 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.paint.Color;
+import javafx.scene.control.ProgressBar;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
@@ -45,6 +46,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.geometry.Pos;
 
 /**
  * Vista principal del simulador.
@@ -725,14 +727,72 @@ public class MainView {
 
         TableColumn<Process, Integer> cpuColumn = new TableColumn<>("CPU Restante");
         cpuColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getRemainingCpu()).asObject());
+        cpuColumn.setCellFactory(col -> new javafx.scene.control.TableCell<Process, Integer>() {
+            private final ProgressBar bar = new ProgressBar(0);
+            private final Label lbl = new Label();
+            private final HBox box = new HBox(6, bar, lbl);
+            {
+                bar.setPrefWidth(120);
+                box.setAlignment(Pos.CENTER_LEFT);
+            }
 
-        TableColumn<Process, Integer> allocatedCpuColumn = new TableColumn<>("CPU Asignada");
+            @Override
+            protected void updateItem(Integer remaining, boolean empty) {
+                super.updateItem(remaining, empty);
+                if (empty || remaining == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    Process p = getTableView().getItems().get(getIndex());
+                    int burst = Math.max(1, p.getCpuBurst());
+                    int used = p.getCpuUsed();
+                    double progress = Math.min(1.0, Math.max(0.0, (double) used / burst));
+                    bar.setProgress(progress);
+                    lbl.setText(String.format("%d/%d", used, burst));
+                    setGraphic(box);
+                }
+            }
+        });
+
+        TableColumn<Process, Integer> allocatedCpuColumn = new TableColumn<>("CPU Asignada (nucleos)");
         allocatedCpuColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getAllocatedCpuUnits()).asObject());
+        allocatedCpuColumn.setCellFactory(col -> new javafx.scene.control.TableCell<Process, Integer>() {
+            @Override
+            protected void updateItem(Integer value, boolean empty) {
+                super.updateItem(value, empty);
+                if (empty || value == null) { setText(null); setGraphic(null); }
+                else {
+                    Process p = getTableView().getItems().get(getIndex());
+                    setText(String.valueOf(value));
+                    if (value > 0) setStyle("-fx-background-color: rgba(173,216,230,0.3);"); else setStyle("");
+                }
+            }
+        });
 
-        TableColumn<Process, Integer> allocatedMemColumn = new TableColumn<>("Memoria Asignada");
+        TableColumn<Process, Integer> memoryReqColumn = new TableColumn<>("Memoria Requerida (MB)");
+        memoryReqColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getMemoryRequired()).asObject());
+
+        TableColumn<Process, Integer> allocatedMemColumn = new TableColumn<>("Memoria Asignada (MB)");
         allocatedMemColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleIntegerProperty(cellData.getValue().getAllocatedMemoryUnits()).asObject());
+        allocatedMemColumn.setCellFactory(col -> new javafx.scene.control.TableCell<Process, Integer>() {
+            @Override
+            protected void updateItem(Integer value, boolean empty) {
+                super.updateItem(value, empty);
+                if (empty || value == null) { setText(null); setGraphic(null); }
+                else {
+                    Process p = getTableView().getItems().get(getIndex());
+                    int req = p.getMemoryRequired();
+                    setText(String.format("%d/%d", value, req));
+                    if (value == 0 && p.getState().name().equals("WAITING")) {
+                        setStyle("-fx-background-color: rgba(255,99,71,0.25);");
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        });
 
-        processTable.getColumns().setAll(pidColumn, nameColumn, stateColumn, priorityColumn, cpuColumn, allocatedCpuColumn, allocatedMemColumn);
+        processTable.getColumns().setAll(pidColumn, nameColumn, stateColumn, priorityColumn, cpuColumn, allocatedCpuColumn, memoryReqColumn, allocatedMemColumn);
         processTable.setItems(processItems);
         processTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
@@ -774,9 +834,9 @@ public class MainView {
         form.add(nameField, 1, 0);
         form.add(new Label("Prioridad"), 0, 1);
         form.add(priorityField, 1, 1);
-        form.add(new Label("CPU"), 0, 2);
+        form.add(new Label("CPU (nucleos)"), 0, 2);
         form.add(cpuField, 1, 2);
-        form.add(new Label("Memoria"), 0, 3);
+        form.add(new Label("Memoria (MB)"), 0, 3);
         form.add(memoryField, 1, 3);
         form.add(new Label("Cantidad aleatoria"), 0, 4);
         form.add(randomCountField, 1, 4);
@@ -934,6 +994,8 @@ public class MainView {
     public void refreshProcesses() {
         // La tabla se sincroniza con el estado actual del modelo.
         processItems.setAll(controller.getProcesses());
+        // Force table redraw so custom cell factories update styles immediately.
+        processTable.refresh();
     }
 
     /**
@@ -961,7 +1023,7 @@ public class MainView {
                 metrics.getThroughput()));
         // Mostrar recursos con unidades (memoria en MB asumida, CPU en unidades)
         var res = controller.getSystemState().getResource();
-        resourceLabel.setText(String.format("Recursos: CPU total: %d unidades | CPU usadas: %d | Memoria total: %d MB | Memoria usada: %d MB",
+            resourceLabel.setText(String.format("Recursos: CPU total: %d nucleos | CPU usadas: %d | Memoria total: %d MB | Memoria usada: %d MB",
             res.getTotalCpu(), res.getUsedCpu(), res.getTotalMemory(), res.getUsedMemory()));
     }
 

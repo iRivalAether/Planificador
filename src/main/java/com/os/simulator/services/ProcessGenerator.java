@@ -30,11 +30,17 @@ public class ProcessGenerator {
         List<Process> processes = new ArrayList<>();
 
         for (int index = 0; index < quantity; index++) {
+            // PID secuencial local; en el contexto real el SimulationService re-asignará PID si es necesario.
             int pid = index + 1;
+            // Prioridad entre 1 y 10 inclusive.
             int priority = random.nextInt(10) + 1;
+            // Rafaga de CPU entre 1 y 20 unidades.
             int cpuBurst = random.nextInt(20) + 1;
+            // Memoria entre 64 y 575 MB (512 + 64 base).
             int memoryRequired = random.nextInt(512) + 64;
+            // Tiempo de llegada aleatorio en ventana de 0..9.
             int arrivalTime = random.nextInt(10);
+            // Crear y añadir el proceso con los parámetros generados.
             processes.add(new Process(pid, "Proceso " + pid, priority, cpuBurst, memoryRequired, arrivalTime));
         }
 
@@ -58,10 +64,13 @@ public class ProcessGenerator {
         List<Process> processes = new ArrayList<>();
 
         for (int index = 0; index < quantity; index++) {
+            // PID local incremental; la entidad que incorpora el proceso puede reasignarlo.
             int pid = index + 1;
+            // Generamos valores dentro de los rangos solicitados mediante randomRange.
             int priority = randomRange(minPriority, maxPriority);
             int cpuBurst = randomRange(minCpu, maxCpu);
             int memoryRequired = randomRange(minMemory, maxMemory);
+            // Distribuimos llegadas en 0..quantity-1 para escalonar arribos.
             int arrivalTime = random.nextInt(Math.max(quantity, 1));
             processes.add(new Process(pid, "Proceso " + pid, priority, cpuBurst, memoryRequired, arrivalTime));
         }
@@ -73,6 +82,7 @@ public class ProcessGenerator {
         // Se normalizan limites para no depender del orden en que se reciban los parametros.
         int realMin = Math.min(min, max);
         int realMax = Math.max(min, max);
+        // Retorna un valor aleatorio en el rango [realMin, realMax].
         return random.nextInt(realMax - realMin + 1) + realMin;
     }
 }

@@ -26,8 +26,8 @@ public class RoundRobinScheduler implements Scheduler {
 
     @Override
     public Process selectNextProcess(Queue<Process> readyQueue) {
-        // Round Robin solo toma el siguiente proceso de la cola; el tiempo lo controla el service de ejecucion.
-        return readyQueue.poll();
+        // Round Robin solo toma el siguiente proceso de la cola; el tiempo (quantum) lo controla el service de ejecución.
+        return readyQueue.poll(); // Se delega la rotación y re-inserción al ExecutionService.
     }
 
     @Override

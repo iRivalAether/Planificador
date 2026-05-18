@@ -39,17 +39,22 @@ public class RoundRobinExecutionService implements AlgorithmExecutionService {
         // Se ejecuta hasta agotar el quantum o hasta que el proceso termine.
         int executedUnits = 0;
         while (executedUnits < quantum && !process.isFinished()) {
+            // Intento de asignar una unidad de CPU; si falla, salimos del bucle y reintentamos luego.
             if (!state.getResource().allocate(1, 0)) {
                 state.logEvent("Round Robin no pudo asignar CPU al PID " + process.getPid());
                 break;
             }
-            // marcar CPU asignada para UI
+            // Marcar CPU asignada para UI (visibilidad del uso de recursos).
             process.setAllocatedCpuUnits(process.getAllocatedCpuUnits() + 1);
 
+            // Ejecutar una unidad de CPU y actualizar contadores globales.
             process.executeOneUnit();
             simulationService.incrementExecutedCpuUnits(1);
+            // Liberar inmediatamente la unidad de CPU para simular asignación por unidad.
             state.getResource().release(1, 0);
+            // Ajustar contador de CPU asignada en la entidad proceso para consistencia UI.
             process.setAllocatedCpuUnits(Math.max(0, process.getAllocatedCpuUnits() - 1));
+            // Avanzar el reloj por cada unidad ejecutada.
             state.advanceTime();
             executedUnits++;
         }

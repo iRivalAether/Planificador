@@ -18,10 +18,11 @@ import java.util.Map;
  * en servicios dedicados. Tambien centraliza importacion, exportacion, historial y metricas.
  */
 public class SimulationService {
-    // Capacidad base de CPU usada en las simulaciones principales.
-    private static final int DEFAULT_TOTAL_CPU = 8;
-    // Capacidad base de memoria para no depender de configuracion externa al iniciar.
-    private static final int DEFAULT_TOTAL_MEMORY = 8192;
+    // Capacidad base de CPU (nucleos) usada en las simulaciones principales.
+    private static final int DEFAULT_TOTAL_CPU = 4;
+    // Capacidad base de memoria (MB) para no depender de configuracion externa al iniciar.
+    // Default: 4 GB = 4096 MB
+    private static final int DEFAULT_TOTAL_MEMORY = 4096;
     // Quantum por defecto cuando el usuario elige Round Robin sin configurar otro valor.
     private static final int DEFAULT_ROUND_ROBIN_QUANTUM = 2;
     // Limite de seguridad para evitar ciclos infinitos en una simulacion mal configurada.

@@ -14,6 +14,7 @@ public class SjfExecutionService implements AlgorithmExecutionService {
         SystemState state = simulationService.getSystemState();
         state.tryAdmitEligibleProcesses();
 
+        // Si no hay procesos listos, avanzamos el tiempo y retornamos.
         if (state.getReadyQueue().isEmpty()) {
             state.logEvent("No hay procesos en cola de listos para SJF.");
             state.advanceTime();
@@ -21,6 +22,7 @@ public class SjfExecutionService implements AlgorithmExecutionService {
             return null;
         }
 
+        // Selecciona el proceso con menor rafaga restante usando el scheduler SJF.
         Process process = simulationService.getScheduler().selectNextProcess(state.getReadyQueue());
         if (process == null) {
             state.logEvent("SJF no retorno un proceso valido.");
@@ -29,14 +31,15 @@ public class SjfExecutionService implements AlgorithmExecutionService {
             return null;
         }
 
+        // Registrar cambio de contexto y marcar como RUNNING.
         simulationService.registerContextSwitch(process);
         process.setState(ProcessState.RUNNING);
         state.logEvent("SJF ejecuta PID " + process.getPid() + " con menor rafaga restante");
         state.logEvent("EVENT:DISPATCH PID " + process.getPid());
         state.logEvent("EVENT:START PID " + process.getPid());
 
+        // Intento de asignar CPU; si falla, reinsertamos en READY para reintentar.
         if (!state.getResource().allocate(1, 0)) {
-            // Si el recurso no alcanza, se conserva el proceso en READY para reintentarlo luego.
             state.logEvent("SJF no pudo asignar CPU al PID " + process.getPid());
             process.setState(ProcessState.READY);
             state.enqueueReadyProcess(process);
@@ -44,21 +47,20 @@ public class SjfExecutionService implements AlgorithmExecutionService {
             simulationService.clearLastDispatchedProcess();
             return process;
         }
-        // marcar CPU asignada para UI
-        process.setAllocatedCpuUnits(process.getAllocatedCpuUnits() + 1);
 
+        // Marcar CPU asignada para visualización y ejecutar una unidad.
+        process.setAllocatedCpuUnits(process.getAllocatedCpuUnits() + 1);
         process.executeOneUnit();
         simulationService.incrementExecutedCpuUnits(1);
         state.getResource().release(1, 0);
         process.setAllocatedCpuUnits(Math.max(0, process.getAllocatedCpuUnits() - 1));
         state.advanceTime();
 
+        // Si terminó, finalizar; si no, devolver a READY para que SJF reevalúe en la siguiente iteración.
         if (process.isFinished()) {
-            // Al terminar, el algoritmo ya no debe volver a considerar este proceso.
             simulationService.finishProcess(process, "Finalizado normalmente");
             state.logEvent("EVENT:END PID " + process.getPid());
         } else {
-            // Si sigue vivo, se reevalua en la siguiente iteracion porque SJF puede cambiar la seleccion.
             process.setState(ProcessState.READY);
             state.enqueueReadyProcess(process);
             state.logEvent("SJF devuelve PID " + process.getPid() + " a READY para reevaluacion");

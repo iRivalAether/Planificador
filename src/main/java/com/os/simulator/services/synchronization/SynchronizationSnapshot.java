@@ -7,15 +7,19 @@ import java.util.List;
  * Snapshot legible del estado de sincronizacion/comunicacion para mostrar en la UI.
  */
 public class SynchronizationSnapshot {
+    // Valor visible en memoria compartida (representación legible del buffer).
     private final String sharedValue;
+    // Estado del mutex y pid del propietario (si existe).
     private final boolean mutexLocked;
     private final Integer mutexOwnerPid;
+    // Listas de espera copiadas para evitar acceso concurrente a estructuras internas.
     private final List<Integer> mutexWaitingPids;
     private final int emptySlotsValue;
     private final List<Integer> emptySlotsWaitingPids;
     private final int filledSlotsValue;
     private final List<Integer> filledSlotsWaitingPids;
 
+    // Constructor que clona las colecciones entrantes para mantener inmutabilidad del snapshot.
     public SynchronizationSnapshot(
             String sharedValue,
             boolean mutexLocked,
@@ -35,6 +39,7 @@ public class SynchronizationSnapshot {
         this.filledSlotsWaitingPids = new ArrayList<>(filledSlotsWaitingPids);
     }
 
+    // Getters que devuelven copias cuando es apropiado para mantener inmutabilidad externa.
     public String getSharedValue() {
         return sharedValue;
     }
