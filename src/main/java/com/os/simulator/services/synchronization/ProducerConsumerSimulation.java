@@ -5,13 +5,17 @@ package com.os.simulator.services.synchronization;
  */
 public class ProducerConsumerSimulation {
     private final SharedMemory sharedMemory;
-    private final Semaphore emptySlots;
-    private final Semaphore filledSlots;
+    private final CommunicationService communicationService;
+    private final SynchronizationService synchronizationService;
 
     public ProducerConsumerSimulation() {
-        this.sharedMemory = new SharedMemory();
-        this.emptySlots = new Semaphore(1);
-        this.filledSlots = new Semaphore(0);
+        this(1);
+    }
+
+    public ProducerConsumerSimulation(int bufferSize) {
+        this.sharedMemory = new SharedMemory(bufferSize);
+        this.communicationService = new CommunicationService(sharedMemory);
+        this.synchronizationService = new SynchronizationService(new Mutex(), new Semaphore(bufferSize), new Semaphore(0));
     }
 
     /**
@@ -22,13 +26,15 @@ public class ProducerConsumerSimulation {
      * @return true si el dato pudo producirse.
      */
     public boolean produce(int pid, String value) {
-        if (!emptySlots.waitFor(pid)) {
+        if (!synchronizationService.acquireProducerSlot(pid)) {
             return false;
         }
 
-        boolean written = sharedMemory.write(pid, value);
-        filledSlots.signal();
-        return written;
+        if (!synchronizationService.enterCriticalSection(pid)) return false;
+        boolean ok = communicationService.write(pid, value);
+        synchronizationService.leaveCriticalSection(pid);
+        synchronizationService.signalProduced();
+        return ok;
     }
 
     /**
@@ -38,16 +44,26 @@ public class ProducerConsumerSimulation {
      * @return valor consumido o null si no habia datos.
      */
     public String consume(int pid) {
-        if (!filledSlots.waitFor(pid)) {
+        if (!synchronizationService.acquireConsumerSlot(pid)) {
             return null;
         }
 
-        String value = sharedMemory.read(pid);
-        emptySlots.signal();
+        if (!synchronizationService.enterCriticalSection(pid)) return null;
+        String value = communicationService.read(pid);
+        synchronizationService.leaveCriticalSection(pid);
+        synchronizationService.signalConsumed();
         return value;
     }
 
     public SharedMemory getSharedMemory() {
         return sharedMemory;
+    }
+
+    public CommunicationService getCommunicationService() {
+        return communicationService;
+    }
+
+    public SynchronizationService getSynchronizationService() {
+        return synchronizationService;
     }
 }

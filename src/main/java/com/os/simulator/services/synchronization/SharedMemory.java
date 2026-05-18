@@ -1,51 +1,58 @@
 package com.os.simulator.services.synchronization;
 
+import java.util.LinkedList;
+import java.util.Queue;
+
 /**
- * Representa un bloque de memoria compartida protegido por un mutex.
+ * Representa un buffer de memoria compartida con capacidad configurable.
  */
 public class SharedMemory {
-    private final Mutex mutex;
-    private String data;
+    private final Queue<String> buffer;
+    private final int capacity;
 
     public SharedMemory() {
-        this.mutex = new Mutex();
-        this.data = "";
+        this(1);
+    }
+
+    public SharedMemory(int capacity) {
+        this.capacity = Math.max(1, capacity);
+        this.buffer = new LinkedList<>();
     }
 
     /**
-     * Escribe informacion en la memoria compartida.
-     *
-     * @param pid proceso que realiza la escritura.
-     * @param value valor a almacenar.
-     * @return true si pudo escribir, false si el mutex estaba ocupado.
+     * Intenta escribir un valor en el buffer.
+     * @param pid escritor (solo para traza)
+     * @param value valor a escribir
+     * @return true si se escribio, false si el buffer esta lleno
      */
     public boolean write(int pid, String value) {
-        if (!mutex.tryLock(pid)) {
-            return false;
+        synchronized (buffer) {
+            if (buffer.size() >= capacity) return false;
+            buffer.add(value);
+            return true;
         }
-
-        data = value;
-        mutex.unlock(pid);
-        return true;
     }
 
     /**
-     * Lee el contenido de la memoria compartida.
-     *
-     * @param pid proceso que realiza la lectura.
-     * @return texto contenido en memoria o null si el mutex no pudo tomarse.
+     * Intenta leer un valor del buffer.
+     * @param pid lector (solo para traza)
+     * @return valor leido o null si esta vacio
      */
     public String read(int pid) {
-        if (!mutex.tryLock(pid)) {
-            return null;
+        synchronized (buffer) {
+            return buffer.poll();
         }
-
-        String currentData = data;
-        mutex.unlock(pid);
-        return currentData;
     }
 
-    public Mutex getMutex() {
-        return mutex;
+    public int getCapacity() { return capacity; }
+
+    public int getSize() { return buffer.size(); }
+
+    /** Devuelve una representacion legible del contenido del buffer. */
+    public String dumpContents() {
+        synchronized (buffer) {
+            if (buffer.isEmpty()) return "[]";
+            return buffer.toString();
+        }
     }
 }

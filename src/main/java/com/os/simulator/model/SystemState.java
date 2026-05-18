@@ -110,6 +110,7 @@ public class SystemState {
         }
 
         process.setMemoryAllocated(true);
+        process.setAllocatedMemoryUnits(process.getMemoryRequired());
         process.setState(ProcessState.READY);
         enqueueReadyProcess(process);
         logEvent("Proceso admitido a READY: PID " + process.getPid());
@@ -242,7 +243,27 @@ public class SystemState {
         if (process != null && process.isMemoryAllocated()) {
             resource.release(0, process.getMemoryRequired());
             process.setMemoryAllocated(false);
+            process.setAllocatedMemoryUnits(0);
         }
+    }
+
+    /**
+     * Detecta si el sistema parece estar en un estado de interbloqueo simple.
+     * Condicion simplificada: todos los procesos activos estan en WAITING (no RUNNING ni READY).
+     * @return true si se detecta posible deadlock.
+     */
+    public boolean detectDeadlock() {
+        boolean hasActive = false;
+        boolean hasWaiting = false;
+        boolean hasRunningOrReady = false;
+        for (Process p : processes) {
+            if (p.getState() != ProcessState.TERMINATED && p.getState() != ProcessState.SUSPENDED) {
+                hasActive = true;
+                if (p.getState() == ProcessState.WAITING) hasWaiting = true;
+                if (p.getState() == ProcessState.RUNNING || p.getState() == ProcessState.READY) hasRunningOrReady = true;
+            }
+        }
+        return hasActive && hasWaiting && !hasRunningOrReady;
     }
 
     /**

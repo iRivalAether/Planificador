@@ -29,6 +29,9 @@ public class Process {
     private String terminationReason;
     // Marca si el proceso ya tiene memoria reservada dentro del simulador.
     private boolean memoryAllocated;
+    // Recursos asignados actualmente al proceso (estado visible para UI).
+    private int allocatedCpuUnits;
+    private int allocatedMemoryUnits;
 
     /**
      * Crea un proceso con sus parametros principales.
@@ -53,6 +56,8 @@ public class Process {
         this.turnaroundTime = 0;
         this.terminationReason = "";
         this.memoryAllocated = false;
+        this.allocatedCpuUnits = 0;
+        this.allocatedMemoryUnits = 0;
     }
 
     /**
@@ -119,6 +124,22 @@ public class Process {
     public void setMemoryAllocated(boolean memoryAllocated) {
         // Este dato evita reservar la misma memoria dos veces cuando el proceso se reanuda.
         this.memoryAllocated = memoryAllocated;
+    }
+
+    public int getAllocatedCpuUnits() {
+        return allocatedCpuUnits;
+    }
+
+    public void setAllocatedCpuUnits(int allocatedCpuUnits) {
+        this.allocatedCpuUnits = Math.max(0, allocatedCpuUnits);
+    }
+
+    public int getAllocatedMemoryUnits() {
+        return allocatedMemoryUnits;
+    }
+
+    public void setAllocatedMemoryUnits(int allocatedMemoryUnits) {
+        this.allocatedMemoryUnits = Math.max(0, allocatedMemoryUnits);
     }
 
     /**

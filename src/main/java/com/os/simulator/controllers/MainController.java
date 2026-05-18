@@ -6,13 +6,10 @@ import com.os.simulator.model.SystemState;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
-import com.os.simulator.services.FCFSScheduler;
-import com.os.simulator.services.PriorityScheduler;
-import com.os.simulator.services.RoundRobinScheduler;
-import com.os.simulator.services.SJFScheduler;
 import com.os.simulator.services.Scheduler;
 import com.os.simulator.services.SimulationService;
 import java.util.List;
+import com.os.simulator.services.synchronization.SynchronizationSnapshot;
 
 /**
  * Controlador principal que conecta la vista con la logica del simulador.
@@ -121,5 +118,33 @@ public class MainController {
 
     public void resetSimulation() {
         simulationService.resetSimulation();
+    }
+
+    public boolean produceInSharedMemory(int pid, String value) {
+        return simulationService.produceInSharedMemory(pid, value);
+    }
+
+    public String consumeFromSharedMemory(int pid) {
+        return simulationService.consumeFromSharedMemory(pid);
+    }
+
+    public void resetProducerConsumerSimulation() {
+        simulationService.resetProducerConsumerSimulation();
+    }
+
+    public void resetProducerConsumerSimulation(int bufferSize) {
+        simulationService.resetProducerConsumerSimulation(bufferSize);
+    }
+
+    public void runProducerConsumerScenario(int numProducers, int numConsumers, int cycles) {
+        simulationService.runProducerConsumerScenario(numProducers, numConsumers, cycles);
+    }
+
+    public SynchronizationSnapshot getSynchronizationSnapshot() {
+        return simulationService.getSynchronizationSnapshot();
+    }
+
+    public int getProducerConsumerBufferCapacity() {
+        return simulationService.getProducerConsumerBufferCapacity();
     }
 }

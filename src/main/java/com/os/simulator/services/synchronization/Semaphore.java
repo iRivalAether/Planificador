@@ -40,9 +40,7 @@ public class Semaphore {
      */
     public Integer signal() {
         Integer released = waitingProcesses.poll();
-        if (released == null) {
-            value++;
-        }
+        value++;
         return released;
     }
 

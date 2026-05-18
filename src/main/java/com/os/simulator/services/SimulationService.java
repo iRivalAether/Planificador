@@ -4,6 +4,8 @@ import com.os.simulator.model.ExecutionMetrics;
 import com.os.simulator.model.Process;
 import com.os.simulator.model.ProcessState;
 import com.os.simulator.model.SystemState;
+import com.os.simulator.services.synchronization.ProducerConsumerSimulation;
+import com.os.simulator.services.synchronization.SynchronizationSnapshot;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -45,6 +47,8 @@ public class SimulationService {
     private int executedCpuUnits;
     // Recuerda el ultimo proceso despachado para medir cambios de contexto.
     private Process lastDispatchedProcess;
+    // Simulador de productor-consumidor para demostraciones de sincronizacion.
+    private ProducerConsumerSimulation producerConsumerSimulation;
 
     /**
      * Crea el servicio con FCFS por defecto.
@@ -68,6 +72,7 @@ public class SimulationService {
         this.contextSwitches = 0;
         this.executedCpuUnits = 0;
         this.lastDispatchedProcess = null;
+        this.producerConsumerSimulation = new ProducerConsumerSimulation();
         setScheduler(initialScheduler == null ? new FCFSScheduler() : initialScheduler);
     }
 
@@ -81,6 +86,171 @@ public class SimulationService {
         this.contextSwitches = 0;
         this.executedCpuUnits = 0;
         this.lastDispatchedProcess = null;
+    }
+
+    /**
+     * Obtiene el simulador de productor-consumidor.
+     *
+     * @return instancia de ProducerConsumerSimulation.
+     */
+    public ProducerConsumerSimulation getProducerConsumerSimulation() {
+        return producerConsumerSimulation;
+    }
+
+    /**
+     * Reinicia la simulacion de productor-consumidor para dejar memoria, mutex y semaforos limpios.
+     */
+    public void resetProducerConsumerSimulation() {
+        resetProducerConsumerSimulation(1);
+    }
+
+    /** Reinicia la demo de productor-consumidor con tamaño de buffer configurado. */
+    public void resetProducerConsumerSimulation(int bufferSize) {
+        this.producerConsumerSimulation = new ProducerConsumerSimulation(Math.max(1, bufferSize));
+        systemState.logEvent("Demo Productor-Consumidor reiniciada (buffer=" + Math.max(1, bufferSize) + ").");
+    }
+
+    /**
+     * Obtiene un snapshot del estado de sincronizacion/comunicacion para la UI.
+     *
+     * @return snapshot del estado actual.
+     */
+    public SynchronizationSnapshot getSynchronizationSnapshot() {
+        var sync = producerConsumerSimulation.getSynchronizationService();
+        var mem = producerConsumerSimulation.getSharedMemory();
+        return new SynchronizationSnapshot(
+            mem.dumpContents(),
+            sync.isMutexLocked(),
+            sync.getMutexOwnerPid(),
+            new ArrayList<>(sync.getMutexWaiting()),
+            sync.getEmptyValue(),
+            new ArrayList<>(sync.getEmptyWaiting()),
+            sync.getFilledValue(),
+            new ArrayList<>(sync.getFilledWaiting()));
+    }
+
+    public int getProducerConsumerBufferCapacity() {
+        try {
+            return producerConsumerSimulation.getSharedMemory().getCapacity();
+        } catch (Exception ex) {
+            return 1;
+        }
+    }
+
+    /**
+     * Ejecuta una produccion en la simulacion de sincronizacion.
+     *
+     * @param pid identificador del productor.
+     * @param value valor a producir.
+     * @return true si logro producir.
+     */
+    public boolean produceInSharedMemory(int pid, String value) {
+        // More detailed logging for producer actions
+        var sync = producerConsumerSimulation.getSynchronizationService();
+        systemState.logEvent("EVENT:PRODUCE_ATTEMPT PID " + pid);
+        boolean acquired = sync.acquireProducerSlot(pid);
+        if (!acquired) {
+            systemState.logEvent("Productor PID " + pid + " bloqueado por empty (sin espacio)");
+            systemState.logEvent("EVENT:PRODUCE_BLOCKED PID " + pid);
+            return false;
+        }
+
+        systemState.logEvent("EVENT:PRODUCE_START PID " + pid);
+        boolean entered = sync.enterCriticalSection(pid);
+        if (!entered) {
+            systemState.logEvent("Productor PID " + pid + " bloqueado por mutex");
+            systemState.logEvent("EVENT:PRODUCE_BLOCKED_MUTEX PID " + pid);
+            return false;
+        }
+
+        boolean ok = producerConsumerSimulation.getCommunicationService().write(pid, value);
+        systemState.logEvent("Productor PID " + pid + " escribio en memoria compartida: " + value);
+        systemState.logEvent("EVENT:PRODUCE PID " + pid);
+        sync.leaveCriticalSection(pid);
+        Integer released = sync.signalProduced();
+        if (released != null) {
+            systemState.logEvent("EVENT:UNBLOCK PID " + released + " BY PRODUCE PID " + pid);
+        }
+        systemState.logEvent("EVENT:PRODUCE_END PID " + pid);
+        return ok;
+    }
+
+    /**
+     * Ejecuta una lectura en la simulacion de sincronizacion.
+     *
+     * @param pid identificador del consumidor.
+     * @return valor consumido o null.
+     */
+    public String consumeFromSharedMemory(int pid) {
+        var sync = producerConsumerSimulation.getSynchronizationService();
+        systemState.logEvent("EVENT:CONSUME_ATTEMPT PID " + pid);
+        boolean acquired = sync.acquireConsumerSlot(pid);
+        if (!acquired) {
+            systemState.logEvent("Consumidor PID " + pid + " bloqueado por filled (sin datos)");
+            systemState.logEvent("EVENT:CONSUME_BLOCKED PID " + pid);
+            return null;
+        }
+
+        systemState.logEvent("EVENT:CONSUME_START PID " + pid);
+        boolean entered = sync.enterCriticalSection(pid);
+        if (!entered) {
+            systemState.logEvent("Consumidor PID " + pid + " bloqueado por mutex");
+            systemState.logEvent("EVENT:CONSUME_BLOCKED_MUTEX PID " + pid);
+            return null;
+        }
+
+        String value = producerConsumerSimulation.getCommunicationService().read(pid);
+        systemState.logEvent("Consumidor PID " + pid + " leyo desde memoria compartida: " + value);
+        systemState.logEvent("EVENT:CONSUME PID " + pid);
+        sync.leaveCriticalSection(pid);
+        Integer released = sync.signalConsumed();
+        if (released != null) {
+            systemState.logEvent("EVENT:UNBLOCK PID " + released + " BY CONSUME PID " + pid);
+        }
+        systemState.logEvent("EVENT:CONSUME_END PID " + pid);
+        return value;
+    }
+
+    /**
+     * Ejecuta un escenario automatico de productor-consumidor.
+     * Crea `numProducers` productores y `numConsumers` consumidores (PIDs separados),
+     * y realiza `cycles` pasos donde cada actor intenta producir/consumir.
+     */
+    public void runProducerConsumerScenario(int numProducers, int numConsumers, int cycles) {
+        int baseProducerPid = 8000; int baseConsumerPid = 9000;
+        // Register demo processes for visibility in UI
+        for (int i = 0; i < numProducers; i++) {
+            int pid = baseProducerPid + i;
+            addProcess(new com.os.simulator.model.Process(pid, "Producer-" + pid, 1, 1, 1, systemState.getCurrentTime()));
+        }
+        for (int i = 0; i < numConsumers; i++) {
+            int pid = baseConsumerPid + i;
+            addProcess(new com.os.simulator.model.Process(pid, "Consumer-" + pid, 1, 1, 1, systemState.getCurrentTime()));
+        }
+
+        // Simple round-robin attempts
+        for (int c = 0; c < cycles; c++) {
+            for (int i = 0; i < numProducers; i++) {
+                int pid = baseProducerPid + i;
+                String value = "val-" + c + "-p" + i;
+                // log and attempt
+                produceInSharedMemory(pid, value);
+                systemState.advanceTime();
+                if (systemState.detectDeadlock()) {
+                    systemState.logEvent("DEADLOCK DETECTED durante escenario productor-consumidor.");
+                    return;
+                }
+            }
+            for (int i = 0; i < numConsumers; i++) {
+                int pid = baseConsumerPid + i;
+                consumeFromSharedMemory(pid);
+                systemState.advanceTime();
+                if (systemState.detectDeadlock()) {
+                    systemState.logEvent("DEADLOCK DETECTED durante escenario productor-consumidor.");
+                    return;
+                }
+            }
+        }
     }
 
     /**
@@ -156,7 +326,11 @@ public class SimulationService {
      */
     public Process runStep() {
         // El coordinador no decide el detalle; solo delega al service del algoritmo activo.
-        return algorithmExecutionService.executeStep(this);
+        Process p = algorithmExecutionService.executeStep(this);
+        if (systemState.detectDeadlock()) {
+            systemState.logEvent("DEADLOCK DETECTED durante ejecucion de algoritmo.");
+        }
+        return p;
     }
 
     /**

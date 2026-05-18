@@ -32,6 +32,8 @@ public class RoundRobinExecutionService implements AlgorithmExecutionService {
         simulationService.registerContextSwitch(process);
         process.setState(ProcessState.RUNNING);
         state.logEvent("Round Robin ejecuta PID " + process.getPid());
+        state.logEvent("EVENT:DISPATCH PID " + process.getPid());
+        state.logEvent("EVENT:START PID " + process.getPid());
 
         int quantum = simulationService.getRoundRobinQuantum();
         // Se ejecuta hasta agotar el quantum o hasta que el proceso termine.
@@ -41,10 +43,13 @@ public class RoundRobinExecutionService implements AlgorithmExecutionService {
                 state.logEvent("Round Robin no pudo asignar CPU al PID " + process.getPid());
                 break;
             }
+            // marcar CPU asignada para UI
+            process.setAllocatedCpuUnits(process.getAllocatedCpuUnits() + 1);
 
             process.executeOneUnit();
             simulationService.incrementExecutedCpuUnits(1);
             state.getResource().release(1, 0);
+            process.setAllocatedCpuUnits(Math.max(0, process.getAllocatedCpuUnits() - 1));
             state.advanceTime();
             executedUnits++;
         }
@@ -52,11 +57,15 @@ public class RoundRobinExecutionService implements AlgorithmExecutionService {
         if (process.isFinished()) {
             // Si termina dentro de su turno, se registra como concluido de inmediato.
             simulationService.finishProcess(process, "Finalizado normalmente");
+            state.logEvent("EVENT:END PID " + process.getPid());
+            state.logEvent("EVENT:FINISH PID " + process.getPid());
         } else {
             // Si no termina, vuelve al final de la cola para que otros procesos tengan oportunidad.
             process.setState(ProcessState.READY);
             state.enqueueReadyProcess(process);
             state.logEvent("Round Robin devuelve PID " + process.getPid() + " al final de READY");
+            state.logEvent("EVENT:END PID " + process.getPid());
+            state.logEvent("EVENT:PREEMPT PID " + process.getPid());
         }
 
         simulationService.setLastDispatchedProcess(process);
